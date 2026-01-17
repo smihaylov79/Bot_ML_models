@@ -1,0 +1,4 @@
+SYMBOL = '[SP500]'
+TIMEFRAME = 'M5'
+DAYS = 50
+LOCAL_TZ = "Europe/Sofia"
