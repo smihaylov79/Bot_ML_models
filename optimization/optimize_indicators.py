@@ -2,12 +2,12 @@ import optuna
 from data_loader.mt5_loader import load_data
 from optimization.objective import create_objective
 from utils.params_io import save_best_params
-from utils.config import TIMEFRAME, DAYS, SYMBOL
+from utils.config import TIMEFRAME, DAYS, SYMBOL, START_DATE, END_DATE, NUMBER_TRIALS
 
 
-def run_optimization(symbol, timeframe, days, n_trials=50):
+def run_optimization(symbol, timeframe, days, start_date, end_date, n_trials=50):
     print("Loading MT5 data...")
-    df_raw = load_data(symbol, timeframe, days)
+    df_raw = load_data(symbol, timeframe, days, start_date, end_date)
 
     print("Preparing objective...")
     objective = create_objective(df_raw)
@@ -26,4 +26,4 @@ def run_optimization(symbol, timeframe, days, n_trials=50):
 
 
 if __name__ == "__main__":
-    run_optimization(SYMBOL, TIMEFRAME, DAYS, n_trials=20)
+    run_optimization(SYMBOL, TIMEFRAME, DAYS, START_DATE, END_DATE, NUMBER_TRIALS)

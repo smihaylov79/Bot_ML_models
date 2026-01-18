@@ -10,10 +10,10 @@ def initialize_mt5():
     print("MT5 initialized successfully.")
 
 
-def load_data(symbol=SYMBOL, timeframe=TIMEFRAME, days=30):
+def load_data(symbol=SYMBOL, timeframe=TIMEFRAME, days=None, start_date=None, end_date=None):
     initialize_mt5()
-    utc_to = datetime.utcnow()
-    utc_from = utc_to - timedelta(days=days)
+    # utc_to = datetime.utcnow()
+    # utc_from = utc_to - timedelta(days=days)
 
     timeframe_map = {
         "M1": mt5.TIMEFRAME_M1,
@@ -29,7 +29,17 @@ def load_data(symbol=SYMBOL, timeframe=TIMEFRAME, days=30):
     if tf is None:
         raise ValueError(f"Unsupported timeframe: {timeframe}")
 
-    rates = mt5.copy_rates_range(symbol, tf, utc_from, utc_to)
+    # --- NEW LOGIC --- # If start_date and end_date are provided → use them
+    if start_date is not None and end_date is not None:
+        rates = mt5.copy_rates_range(symbol, tf, start_date, end_date)
+    else:
+        if days is None:
+            raise ValueError("Either days or (start_date and end_date) must be provided.")
+        utc_to = datetime.utcnow()
+        utc_from = utc_to - timedelta(days=days)
+        rates = mt5.copy_rates_range(symbol, tf, utc_from, utc_to)
+
+    # rates = mt5.copy_rates_range(symbol, tf, utc_from, utc_to)
     if rates is None:
         raise RuntimeError(f"Failed to load data for {symbol}: {mt5.last_error()}")
 
