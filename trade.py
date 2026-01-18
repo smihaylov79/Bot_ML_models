@@ -4,7 +4,7 @@ import joblib
 import MetaTrader5 as mt5
 import numpy as np
 
-from data_loader.mt5_loader import load_data  # your load_data
+from data_loader.mt5_loader import load_data, load_live_bars  # your load_data
 from features.feature_engineering import build_features
 from backtesting.backtest_engine import generate_signals, load_model  # your generate_signals
 from utils.config import (
@@ -22,46 +22,29 @@ def initialize_mt5():
     print("MT5 initialized.")
 
 
-# def load_active_model():
-#     model_path = Path("models/active_model.pkl")
-#     if not model_path.exists():
-#         raise FileNotFoundError("No active_model.pkl found.")
-#     model = joblib.load(model_path)
-#     print("Loaded model:", model.__class__.__name__)
-#     return model
+def calc_required_margin(symbol, volume, direction):
+    tick = mt5.symbol_info_tick(symbol)
+    if tick is None:
+        raise RuntimeError(f"symbol_info_tick failed: {mt5.last_error()}")
+
+    price = tick.ask if direction == mt5.ORDER_TYPE_BUY else tick.bid
+
+    margin = mt5.order_calc_margin(direction, symbol, volume, price)
+    if margin is None:
+        raise RuntimeError(f"order_calc_margin failed: {mt5.last_error()}")
+
+    return margin
 
 
-def calc_required_margin(symbol, volume):
-    info = mt5.symbol_info(symbol)
-    if info is None:
-        raise RuntimeError(f"symbol_info failed: {mt5.last_error()}")
-
-    # If broker provides margin_initial → use it
-    if info.margin_initial > 0:
-        return info.margin_initial * volume
-
-    # Otherwise fallback to margin_rate
-    if info.margin_rate > 0:
-        # margin = price * contract_size * volume * margin_rate
-        tick = mt5.symbol_info_tick(symbol)
-        price = tick.ask if tick else info.last
-        return price * info.trade_contract_size * volume * info.margin_rate
-
-    raise RuntimeError("No margin info available for this symbol.")
-
-
-def has_enough_margin(symbol, volume):
-    acc  = mt5.account_info()
+def has_enough_margin(symbol, volume, direction):
+    acc = mt5.account_info()
     if acc is None:
         raise RuntimeError(f"account_info failed: {mt5.last_error()}")
 
-    # very simple approximation, same as backtest:
-    required = calc_required_margin(symbol, volume)
-    # margin_for_trade = (price * position_size * CONTRACT_SIZE) / LEVERAGE
-    max_allowed_margin = acc.equity * MARGIN_LIMIT
+    required = calc_required_margin(symbol, volume, direction)
+    max_allowed = acc.equity * MARGIN_LIMIT
 
-    # used_margin is info.margin
-    return acc.margin + required <= max_allowed_margin
+    return acc.margin + required <= max_allowed
 
 
 def place_order(symbol, direction, price, atr_value):
@@ -94,21 +77,38 @@ def place_order(symbol, direction, price, atr_value):
     }
 
     result = mt5.order_send(request)
+    if result is None:
+        print("order_send returned None:", mt5.last_error())
+        return False
     if result.retcode != mt5.TRADE_RETCODE_DONE:
         print("Order failed:", result.retcode, result.comment)
+        return False
     else:
         print(f"Order placed: {direction}, price={price}, sl={sl}, tp={tp}")
+        return True
+
+
+def ensure_symbol(symbol):
+    info = mt5.symbol_info(symbol)
+    if info is None:
+        raise RuntimeError(f"Symbol '{symbol}' not found in MT5.")
+
+    if not info.visible:
+        if not mt5.symbol_select(symbol, True):
+            raise RuntimeError(f"Failed to select symbol '{symbol}'.")
+    print(f"Symbol '{symbol}' selected.")
 
 
 def live_trading_loop(poll_seconds=300, lookback_days=5):
     initialize_mt5()
+    ensure_symbol(SYMBOL)
     model = load_model()
 
     last_bar_time = None
 
     while True:
         try:
-            df = load_data(symbol=SYMBOL, timeframe=TIMEFRAME, days=lookback_days)
+            df = load_live_bars(SYMBOL, TIMEFRAME, n_bars=500)
             df_feat = build_features(df)
             if df_feat.empty:
                 time.sleep(poll_seconds)
@@ -144,7 +144,9 @@ def live_trading_loop(poll_seconds=300, lookback_days=5):
                 time.sleep(poll_seconds)
                 continue
 
-            if not has_enough_margin(price, POSITION_SIZE):
+            direction = mt5.ORDER_TYPE_BUY if sig == 1 else mt5.ORDER_TYPE_SELL
+
+            if not has_enough_margin(SYMBOL, POSITION_SIZE, direction):
                 print(bar_time, "Not enough margin, skipping trade.")
                 time.sleep(poll_seconds)
                 continue

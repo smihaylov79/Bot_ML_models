@@ -57,5 +57,31 @@ def get_latest_tick(symbol=SYMBOL):
         raise RuntimeError(f"Failed to get latest tick for {symbol}: {mt5.last_error()}")
     return tick
 
+def load_live_bars(symbol, timeframe, n_bars=500):
+    timeframe_map = {
+        "M1": mt5.TIMEFRAME_M1,
+        "M5": mt5.TIMEFRAME_M5,
+        "M15": mt5.TIMEFRAME_M15,
+        "M30": mt5.TIMEFRAME_M30,
+        "H1": mt5.TIMEFRAME_H1,
+        "H4": mt5.TIMEFRAME_H4,
+        "D1": mt5.TIMEFRAME_D1
+    }
+
+    tf = timeframe_map[timeframe]
+
+    rates = mt5.copy_rates_from_pos(symbol, tf, 0, n_bars)
+    if rates is None:
+        raise RuntimeError(f"Failed to load live bars: {mt5.last_error()}")
+
+    df = pd.DataFrame(rates)
+    df['time'] = pd.to_datetime(df['time'], unit='s')
+    df.set_index('time', inplace=True)
+    df.index = df.index.tz_localize('UTC').tz_convert(LOCAL_TZ)
+
+    # remove forming bar
+    df = df.iloc[:-1]
+
+    return df
 
 
