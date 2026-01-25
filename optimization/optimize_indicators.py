@@ -17,12 +17,20 @@ def run_optimization(symbol, timeframe, days, start_date, end_date, n_trials=50)
     study.optimize(objective, n_trials=n_trials)
 
     print("\n===== Optimization Complete =====")
-    print("Best Score:", study.best_value)
-    print("Best Params:", study.best_params)
+    print(f"Best Score (PF): {study.best_value:.4f}")
 
-    save_best_params(study.best_params)
+    # Extract structured params from user_attrs
+    best = study.best_trial.user_attrs
+
+    print(f"Best Model: {best['model_name']}")
+    print("Indicator Params:", best["indicators"])
+    print(f"{best['model_name']} Params:", best.get(best["model_name"], {}))
+
+    # Save structured params
+    save_best_params(study)
 
     return study
+
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 import xgboost as xgb
 import pandas as pd
+from sklearn.calibration import CalibratedClassifierCV
+
 from utils.target_encoding import encode_target
 
 
@@ -10,7 +12,6 @@ def train_xgb(train_df: pd.DataFrame, params: dict):
     """
 
     X = train_df.drop(columns=["target"])
-    y = train_df["target"]
 
     y = encode_target(train_df["target"])
 
@@ -28,7 +29,10 @@ def train_xgb(train_df: pd.DataFrame, params: dict):
     # Merge defaults with Optuna params
     model_params = {**default_params, **params}
 
-    model = xgb.XGBClassifier(**model_params)
-    model.fit(X, y)
+    base_model = xgb.XGBClassifier(**model_params)
+    base_model.fit(X, y)
 
-    return model
+    calibrated = CalibratedClassifierCV(base_model, method="isotonic", cv=3)
+    calibrated.fit(X, y)
+
+    return calibrated

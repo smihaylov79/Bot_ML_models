@@ -87,7 +87,70 @@ def add_target(df, future_n=2, threshold=0.0):
     return df
 
 
-def build_features(df, params=None, future_n=2, threshold=0.0):
+def add_regime_features(df):
+    # --- TIME REGIMES ---
+    df["hour"] = df.index.hour
+    df["weekday"] = df.index.dayofweek
+
+    # --- VOLATILITY REGIMES ---
+    df["atr_norm"] = df["atr"] / df["close"]
+    df["vol_compression"] = df["atr"] / df["atr"].rolling(20).mean()
+    df["vol_shock"] = df["atr"].pct_change()
+
+    # --- TREND REGIMES ---
+    df["ma_fast"] = ema(df["close"], 10)
+    df["ma_slow"] = ema(df["close"], 30)
+    df["trend_strength"] = df["ma_fast"] - df["ma_slow"]
+    df["trend_slope"] = df["trend_strength"].diff()
+    df["ma_dist"] = (df["close"] - df["ma_slow"]) / df["ma_slow"]
+
+    # --- BOLLINGER REGIMES ---
+    df["bb_width_norm"] = df["bb_width"] / df["close"]
+    df["bb_squeeze"] = (
+        df["bb_width_norm"] < df["bb_width_norm"].rolling(100).quantile(0.2)
+    ).astype(int)
+
+    # --- RETURN REGIMES ---
+    df["ret_abs"] = df["return_1"].abs()
+    df["ret_rolling_std"] = df["return_1"].rolling(20).std()
+    df["ret_zscore"] = (
+        df["return_1"] - df["return_1"].rolling(20).mean()
+    ) / df["return_1"].rolling(20).std()
+
+    return df
+
+
+def add_tp_sl_target(df, sl_mult=2.0, tp_mult=2.0, future_n=20):
+    """
+    Creates a target based on whether TP or SL is hit first.
+    - 1  → TP hit first
+    - -1 → SL hit first
+    - 0  → neither hit (ignored or no-trade)
+    """
+
+    df = df.copy()
+
+    # --- Compute SL/TP levels ---
+    sl_price = df["close"] - df["atr"] * sl_mult
+    tp_price = df["close"] + df["atr"] * tp_mult
+
+    # --- Compute future high/low window ---
+    future_high = df["high"].rolling(future_n).max().shift(-future_n + 1)
+    future_low = df["low"].rolling(future_n).min().shift(-future_n + 1)
+
+    # --- Initialize target ---
+    df["target"] = 0
+
+    # TP hit first
+    df.loc[future_high >= tp_price, "target"] = 1
+
+    # SL hit first
+    df.loc[future_low <= sl_price, "target"] = -1
+
+    return df
+
+
+def build_features(df, params=None, future_n=20, sl_mult=2.0, tp_mult=2.0):
     df = df.copy()
     params = params or {}
 
@@ -96,6 +159,12 @@ def build_features(df, params=None, future_n=2, threshold=0.0):
     df = add_momentum_features(df, params)
     df = add_trend_features(df, params)
     df = add_optional_advanced_features(df, params)
-    df = add_target(df, future_n, threshold)
+
+    # NEW: regime features
+    df = add_regime_features(df)
+
+    # NEW: TP/SL target
+    df = add_tp_sl_target(df, sl_mult=sl_mult, tp_mult=tp_mult, future_n=future_n)
 
     return df.dropna()
+

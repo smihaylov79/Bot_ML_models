@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from data_loader.mt5_loader import load_data
+from diagnostics.regime_features import compute_trend_strength
 from features.feature_engineering import build_features
 from utils.params_io import load_best_params
 from utils.target_encoding import decode_target
@@ -31,6 +32,10 @@ def prepare_data(symbol, timeframe, start_date, end_date):
 
     # Drop rows with NaNs from indicators
     df = df.dropna().copy()
+    # df["hour"] = df.index.hour
+    # df["weekday"] = df.index.day_name()
+    # df["atr_norm"] = df["atr"] / df["close"]
+    # df["trend_strength"] = compute_trend_strength(df["close"])  # from regime_features
 
     return df, best_params
 

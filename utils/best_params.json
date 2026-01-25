@@ -1,18 +1,25 @@
 {
-    "rsi_window": 15,
-    "ema_fast": 15,
-    "ema_slow": 50,
-    "atr_window": 16,
-    "stoch_k": 20,
-    "stoch_d": 5,
-    "bb_window": 40,
-    "momentum_window": 16,
-    "macd_fast": 11,
-    "macd_slow": 36,
-    "macd_signal": 11,
-    "max_depth": 4,
-    "learning_rate": 0.21142661903769003,
-    "n_estimators": 422,
-    "subsample": 0.9426186243120621,
-    "colsample_bytree": 0.9991724442257641
+    "model_name": "xgb",
+    "indicators": {
+        "rsi_window": 27,
+        "ema_fast": 17,
+        "ema_slow": 60,
+        "atr_window": 17,
+        "stoch_k": 8,
+        "stoch_d": 4,
+        "bb_window": 19,
+        "momentum_window": 14,
+        "macd_fast": 7,
+        "macd_slow": 25,
+        "macd_signal": 7
+    },
+    "xgb": {
+        "max_depth": 6,
+        "learning_rate": 0.07449638678450135,
+        "n_estimators": 270,
+        "subsample": 0.9150252703888556,
+        "colsample_bytree": 0.8008654402746609
+    },
+    "rf": {},
+    "lgbm": {}
 }

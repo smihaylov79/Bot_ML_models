@@ -1,3 +1,4 @@
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 from utils.target_encoding import encode_target
@@ -10,7 +11,7 @@ def train_rf(train_df: pd.DataFrame, params: dict | None = None):
     """
 
     X = train_df.drop(columns=["target"])
-    y = train_df["target"]
+    # y = train_df["target"]
 
     y = encode_target(train_df["target"])
 
@@ -21,11 +22,15 @@ def train_rf(train_df: pd.DataFrame, params: dict | None = None):
         "min_samples_leaf": 2,
         "bootstrap": True,
         "n_jobs": -1,
+        "class_weight": "balanced",
     }
 
     model_params = {**default_params, **(params or {})}
 
-    model = RandomForestClassifier(**model_params)
-    model.fit(X, y)
+    base_model = RandomForestClassifier(**model_params)
+    base_model.fit(X, y)
 
-    return model
+    calibrated = CalibratedClassifierCV(base_model, method="isotonic", cv=3)
+    calibrated.fit(X, y)
+
+    return calibrated

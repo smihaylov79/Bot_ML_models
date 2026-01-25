@@ -3,12 +3,15 @@ import importlib
 
 import os
 import pickle
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import joblib
 
+from analytics.dashboard import generate_dashboard
+from analytics.utils import build_equity_curve
 from backtesting.real_backtest import backtest_live_real
+from data_loader.account_hystory import load_raw_account_history, normalize_deals_to_trades, get_starting_balance
 from optimization.optimize_indicators import run_optimization
 from train import train
 from backtesting import real_backtest
@@ -67,6 +70,7 @@ def main():
         print("3. Backtest")
         print("4. Edit config values")
         print("5. Live Trading")
+        print("6. Generate dashboard")
         print("0. Exit")
 
         choice = input("\nSelect an option: ").strip()
@@ -82,6 +86,14 @@ def main():
             edit_config()
         elif choice == "5":
             run_live_trading()
+        elif choice == "6":
+            end = datetime.now()
+            start = end - timedelta(days=7)
+
+            raw = load_raw_account_history(start, end)
+            trades = normalize_deals_to_trades(raw)
+            equity_curve = build_equity_curve(trades, get_starting_balance(start, end))
+            generate_dashboard(trades, equity_curve, output_path="dashboard.html")
         elif choice == "0":
             print("Goodbye!")
             break
