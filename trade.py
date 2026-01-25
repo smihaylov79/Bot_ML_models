@@ -14,6 +14,7 @@ from utils.config import (
     CONTRACT_SIZE, LEVERAGE, MARGIN_LIMIT,
     POSITION_SIZE,
 )
+from utils.params_io import load_best_params
 
 
 def initialize_mt5():
@@ -104,12 +105,15 @@ def live_trading_loop(poll_seconds=300, lookback_days=5):
     ensure_symbol(SYMBOL)
     model = load_model()
 
+    best_params = load_best_params()
+    indicator_params = best_params["indicators"]
+
     last_bar_time = None
 
     while True:
         try:
             df = load_live_bars(SYMBOL, TIMEFRAME, n_bars=500)
-            df_feat = build_features(df)
+            df_feat = build_features(df, params=indicator_params)
             if df_feat.empty:
                 time.sleep(poll_seconds)
                 continue
