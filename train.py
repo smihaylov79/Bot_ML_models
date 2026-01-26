@@ -1,6 +1,10 @@
 import matplotlib
 import numpy as np
 
+from models.lgbm_model import train_lgbm
+from models.rf_model import train_rf
+from models.xgb_model import train_xgb
+
 matplotlib.use("TkAgg")
 
 from collections import Counter
@@ -28,60 +32,53 @@ SAVE_DIR = Path("models/saved")
 SAVE_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def save_active_model(model):
+    save_path = SAVE_DIR / "active_model.pkl"
+    joblib.dump(model, save_path)
+    print(f"Saved active model to {save_path}")
+
+
 def train(symbol, timeframe, days, start_date, end_date):
     print("Loading optimized parameters...")
     best_params = load_best_params()
 
+    # Extract model name
     model_name = best_params["model_name"]
+
+    # Extract indicator parameters
     indicator_params = best_params["indicators"]
 
-    model_params = {
-        "xgb": best_params.get("xgb", {}),
-        "rf": best_params.get("rf", {}),
-        "lgbm": best_params.get("lgbm", {}),
-    }
+    # Extract the CLEAN model parameters
+    # These were stored under "model_params" in the objective
+    model_params = best_params["model_params"]
 
-    print("Loading MT5 data...")
-    df_raw = load_data(symbol, timeframe, days, start_date=start_date, end_date=end_date)
+    print(f"Training model: {model_name}")
+    print("Indicator params:", indicator_params)
+    print("Model params:", model_params)
 
-    print("Building features...")
-    df = build_features(df_raw, params=indicator_params)
+    # Load raw data
+    df_raw = load_data(symbol, timeframe, days, start_date, end_date)
 
-    # Train/test split
-    split = int(len(df) * 0.8)
-    train_df = df.iloc[:split]
-    test_df = df.iloc[split:]
+    # Build features
+    df_feat = build_features(
+        df_raw,
+        params=indicator_params,
+        future_n=20
+    )
 
-    print(f"Training best model: {model_name}")
-    train_fn = get_model(model_name)
-    best_model = train_fn(train_df, model_params[model_name])
-
-    print("Evaluating model...")
-    X_test = test_df.drop(columns=["target"])
-    y_test = test_df["target"]
-
-    preds = best_model.predict(X_test)
-    preds = decode_target(preds)
-
-    print("Predicted class distribution:", Counter(preds))
-    print("True class distribution:", Counter(y_test))
-
-    score = f1_score(preds, y_test)
-    print(f"{model_name} F1 score: {score:.4f}")
-
-    # Plots
-    print("Generating backtest plots...")
-    plot_equity_curve(test_df, preds, future_n=20, title=f"Equity Curve - {model_name}")
-    plot_rolling_f1(test_df, preds, window=200, title=f"Rolling F1 Score - {model_name}")
-    plot_confusion_matrix(test_df, preds, title=f"Confusion Matrix - {model_name}")
-    plot_feature_importance(best_model, X_test.columns, title=f"Feature Importance - {model_name}")
+    # Train the correct model
+    if model_name == "xgb":
+        model = train_xgb(df_feat, model_params)
+    elif model_name == "rf":
+        model = train_rf(df_feat, model_params)
+    else:
+        model = train_lgbm(df_feat, model_params)
 
     # Save model
-    save_path = SAVE_DIR / "active_model.pkl"
-    joblib.dump(best_model, save_path)
-    print(f"Saved active model to {save_path}")
+    save_active_model(model)
 
-    return model_name, save_path
+    print("Model training complete.")
+    return model
 
 #
 # def train(symbol, timeframe, days, start_date, end_date):

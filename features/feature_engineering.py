@@ -78,13 +78,13 @@ def add_optional_advanced_features(df, params):
     return df
 
 
-def add_target(df, future_n=2, threshold=0.0):
-    future_price = df["close"].shift(-future_n)
-    ret = (future_price - df["close"]) / df["close"]
-    df["target"] = 0
-    df.loc[ret > threshold, "target"] = 1
-    df.loc[ret < -threshold, "target"] = -1
-    return df
+# def add_target(df, future_n=2, threshold=0.0):
+#     future_price = df["close"].shift(-future_n)
+#     ret = (future_price - df["close"]) / df["close"]
+#     df["target"] = 0
+#     df.loc[ret > threshold, "target"] = 1
+#     df.loc[ret < -threshold, "target"] = -1
+#     return df
 
 
 def add_regime_features(df):
@@ -121,31 +121,21 @@ def add_regime_features(df):
 
 
 def add_tp_sl_target(df, sl_mult=2.0, tp_mult=2.0, future_n=20):
-    """
-    Creates a target based on whether TP or SL is hit first.
-    - 1  → TP hit first
-    - -1 → SL hit first
-    - 0  → neither hit (ignored or no-trade)
-    """
-
     df = df.copy()
 
-    # --- Compute SL/TP levels ---
+    # Compute SL/TP levels
     sl_price = df["close"] - df["atr"] * sl_mult
     tp_price = df["close"] + df["atr"] * tp_mult
 
-    # --- Compute future high/low window ---
-    future_high = df["high"].rolling(future_n).max().shift(-future_n + 1)
-    future_low = df["low"].rolling(future_n).min().shift(-future_n + 1)
+    # Correct future window alignment
+    future_high = df["high"].rolling(future_n).max().shift(-future_n)
+    future_low  = df["low"].rolling(future_n).min().shift(-future_n)
 
-    # --- Initialize target ---
+    # Initialize target
     df["target"] = 0
 
-    # TP hit first
     df.loc[future_high >= tp_price, "target"] = 1
-
-    # SL hit first
-    df.loc[future_low <= sl_price, "target"] = -1
+    df.loc[future_low  <= sl_price, "target"] = -1
 
     return df
 
@@ -154,17 +144,23 @@ def build_features(df, params=None, future_n=20, sl_mult=2.0, tp_mult=2.0):
     df = df.copy()
     params = params or {}
 
+    # 1. Add all features
     df = add_basic_price_features(df)
     df = add_volatility_features(df, params)
     df = add_momentum_features(df, params)
     df = add_trend_features(df, params)
     df = add_optional_advanced_features(df, params)
-
-    # NEW: regime features
     df = add_regime_features(df)
 
-    # NEW: TP/SL target
+    # 2. Drop NaNs BEFORE computing target
+    df = df.dropna().copy()
+
+    # 3. Compute target AFTER features
     df = add_tp_sl_target(df, sl_mult=sl_mult, tp_mult=tp_mult, future_n=future_n)
 
-    return df.dropna()
+    # 4. Drop rows where target is NaN (end of dataset)
+    df = df.dropna(subset=["target"])
+
+    return df
+
 

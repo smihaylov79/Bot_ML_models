@@ -1,3 +1,4 @@
+# optimization/search_space.py
 def indicator_search_space(trial):
     return {
         "rsi_window": trial.suggest_int("rsi_window", 5, 30),
@@ -21,6 +22,10 @@ def xgb_search_space(trial):
         "n_estimators": trial.suggest_int("xgb_n_estimators", 100, 600),
         "subsample": trial.suggest_float("xgb_subsample", 0.6, 1.0),
         "colsample_bytree": trial.suggest_float("xgb_colsample_bytree", 0.6, 1.0),
+        "reg_alpha": trial.suggest_float("xgb_reg_alpha", 0.0, 1.0),
+        "reg_lambda": trial.suggest_float("xgb_reg_lambda", 0.0, 5.0),
+        "min_child_weight": trial.suggest_float("xgb_min_child_weight", 1.0, 10.0),
+        "gamma": trial.suggest_float("xgb_gamma", 0.0, 5.0),
     }
 
 
@@ -31,6 +36,7 @@ def rf_search_space(trial):
         "min_samples_split": trial.suggest_int("rf_min_samples_split", 2, 20),
         "min_samples_leaf": trial.suggest_int("rf_min_samples_leaf", 1, 10),
         "bootstrap": trial.suggest_categorical("rf_bootstrap", [True, False]),
+        "max_features": trial.suggest_categorical("rf_max_features", ["sqrt", "log2", None]),
     }
 
 
@@ -41,16 +47,8 @@ def lgbm_search_space(trial):
         "num_leaves": trial.suggest_int("lgbm_num_leaves", 20, 200),
         "subsample": trial.suggest_float("lgbm_subsample", 0.6, 1.0),
         "colsample_bytree": trial.suggest_float("lgbm_colsample_bytree", 0.6, 1.0),
+        "lambda_l1": trial.suggest_float("lgbm_lambda_l1", 0.0, 5.0),
+        "lambda_l2": trial.suggest_float("lgbm_lambda_l2", 0.0, 5.0),
+        "min_child_samples": trial.suggest_int("lgbm_min_child_samples", 10, 100),
+        "is_unbalance": True,
     }
-
-
-# def model_search_space(trial):
-#     return {
-#         "max_depth": trial.suggest_int("max_depth", 3, 10),
-#         "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.3),
-#         "n_estimators": trial.suggest_int("n_estimators", 100, 600),
-#         "subsample": trial.suggest_float("subsample", 0.6, 1.0),
-#         "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
-#     }
-
-
